@@ -1,0 +1,62 @@
+// V-Ray OSL Flakes Example https://docs.chaosgroup.com/display/OSLShaders/Flakes+normal+map modified by Saul Espinosa
+
+shader
+flakes
+(
+    float flake_scale = 10.0 [[ float min = 0, float max =100]],
+    float flake_size = 0.5 [[ float min = 0, float max =100]],
+    float flake_size_variance = 0.0 [[ float min = 0, float max =100]],
+    float flake_normal_orientation = 0.0 [[ float min = 0, float max =1]],
+     
+    output color result = 1.0,
+    output float alpha  = 1.0
+)
+{
+    float safe_flake_size_variance = clamp(flake_size_variance, 0.1, 1.0);
+    vector cellCenters[9] = {
+        vector( 0.5,  0.5,  0.0),
+        vector( 1.5,  0.5,  0.0),
+        vector( 1.5,  1.5,  0.0),
+        vector( 0.5,  1.5,  0.0),
+        vector(-0.5,  1.5,  0.0),
+        vector(-0.5,  0.5,  0.0),
+        vector(-0.5, -0.5,  0.0),
+        vector( 0.5, -0.5,  0.0),
+        vector( 1.5, -0.5,  0.0)
+    };
+     
+    point position = vector(u, v, 0.0);
+    position = flake_scale * position;
+     
+    point base = floor(position);
+     
+    point nearestCell = point(0.0, 0.0, 1.0);
+    int nearestCellIndex = -1;
+    for(int cellIndex = 0; cellIndex < 9; ++cellIndex)   {
+        point cellCenter = base + cellCenters[cellIndex];
+         
+        vector centerOffset = cellnoise(cellCenter) * 2.0 - 1.0;
+        centerOffset[2] *= safe_flake_size_variance;
+        centerOffset = normalize(centerOffset);
+         
+        cellCenter += 0.5 * centerOffset;
+        float cellDistance = distance(position, cellCenter);
+        if(cellDistance < flake_size && cellCenter[2] < nearestCell[2]) {
+            nearestCell = cellCenter;
+            nearestCellIndex = cellIndex;
+        }
+    }
+     
+    result = color(0.5, 0.5, 1.0);
+    alpha = 0.0;
+     
+    if (nearestCellIndex != -1) {
+        vector randomNormal = cellnoise(base + cellCenters[nearestCellIndex] + vector(0.0, 0.0, 1.5));
+        randomNormal = 2.0 * randomNormal - 1.0;
+        randomNormal = faceforward(randomNormal, I, randomNormal);
+        randomNormal = normalize(mix(randomNormal, vector(0.0, 0.0, 1.0), flake_normal_orientation));
+         
+        result = color(0.5*randomNormal[0]+0.5, 0.5*randomNormal[1]+0.5, randomNormal[2]);
+        alpha = 1.0;
+    }
+}
